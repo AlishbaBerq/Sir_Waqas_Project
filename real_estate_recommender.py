@@ -1,35 +1,42 @@
+# Install required libraries
+!pip install streamlit
+
+# Import necessary libraries
 import streamlit as st
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-# Load the dataset
-@st.cache
-def load_data():
-    url = "https://drive.google.com/uc?export=download&id=1sD13fRIl21b1k8-DbriEbG-Or5RrPcXm"
-    df = pd.read_csv(url)
-    return df
+# Load real estate data (example)
+data = {
+    'Property': ['House A', 'House B', 'House C', 'House D'],
+    'Description': ['Beautiful house in downtown.', 'Cozy apartment with a garden.', 'Spacious villa with pool.', 'Modern loft in the city center.']
+}
 
-df = load_data()
+df = pd.DataFrame(data)
 
-# Sidebar for user input
-st.sidebar.title('Real Estate Preferences')
-location = st.sidebar.selectbox('Location', df['Location'].unique())
-price_range = st.sidebar.slider('Price Range ($)', float(df['Price'].min()), float(df['Price'].max()), (float(df['Price'].min()), float(df['Price'].max())))
-bedrooms = st.sidebar.slider('Bedrooms', int(df['Bedrooms'].min()), int(df['Bedrooms'].max()), int(df['Bedrooms'].min()))
-bathrooms = st.sidebar.slider('Bathrooms', int(df['Bathrooms'].min()), int(df['Bathrooms'].max()), int(df['Bathrooms'].min()))
+# TF-IDF Vectorization
+tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf_vectorizer.fit_transform(df['Description'])
 
-# Filter the dataset based on user preferences
-filtered_df = df[
-    (df['Location'] == location) &
-    (df['Price'] >= price_range[0]) &
-    (df['Price'] <= price_range[1]) &
-    (df['Bedrooms'] >= bedrooms) &
-    (df['Bathrooms'] >= bathrooms)
-]
+# Calculate similarity matrix
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
-# Display recommended properties
-st.title('Real Estate Recommender System')
-st.subheader('Recommended Properties')
-if filtered_df.empty:
-    st.write('No properties match your preferences.')
-else:
-    st.write(filtered_df)
+# Function to recommend properties
+def recommend_property(property_name, cosine_sim=cosine_sim):
+    idx = df[df['Property'] == property_name].index[0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:4]  # Get the top 3 similar properties
+    
+    property_indices = [i[0] for i in sim_scores]
+    return df['Property'].iloc[property_indices]
+
+# Streamlit UI
+st.title('Real Estate Recommendation System')
+
+property_name = st.selectbox('Select a property:', df['Property'])
+
+if st.button('Find Similar Properties'):
+    recommendations = recommend_property(property_name)
+    st.write(recommendations)
